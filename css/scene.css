@@ -1,0 +1,102 @@
+/* scene.css - specific to the 3D viewer */
+body {
+  margin: 0;
+  overflow: hidden;
+  background-color: #87CEEB; /* Sky blue fallback */
+}
+
+#scene-container {
+  width: 100vw;
+  height: 100vh;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+canvas {
+  display: block;
+}
+
+/* Control Panel */
+.controls-panel {
+  position: absolute;
+  top: 80px;
+  right: 20px;
+  width: 320px;
+  z-index: 1000;
+  color: var(--color-text);
+  font-family: var(--font-main);
+  transition: transform 0.3s ease;
+}
+
+.controls-panel.collapsed .panel-content {
+  display: none;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(0, 217, 255, 0.05);
+  border-radius: 12px 12px 0 0;
+}
+
+.panel-header h3 { margin: 0; font-size: 1.1rem; color: var(--color-primary); }
+
+.panel-content {
+  padding: 1rem;
+  max-height: calc(100vh - 150px);
+  overflow-y: auto;
+}
+
+.control-group {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.control-group:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.control-group h4 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--color-text-muted);
+  margin-bottom: 0.75rem;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--color-primary);
+  margin-top: 0.5rem;
+}
+
+.telemetry .data-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-family: monospace;
+  font-size: 0.95rem;
+}
+
+.telemetry .data-row span:last-child {
+  color: var(--color-primary);
+  font-weight: bold;
+}
+
+@media (max-width: 768px) {
+  .controls-panel {
+    top: auto;
+    bottom: 20px;
+    right: 50%;
+    transform: translateX(50%);
+    width: 90%;
+  }
+}
