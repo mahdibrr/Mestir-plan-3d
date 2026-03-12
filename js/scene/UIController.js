@@ -26,8 +26,18 @@ export class UIController {
   }
   
   initEventListeners() {
-    if(!this.elements.playPauseBtn) return; // fail safe if UI not loaded
+    // Fail safe if UI elements not loaded
+    if(!this.elements.playPauseBtn && !document.getElementById('demo-btn')) return;
     
+    // Check if we're on the diagram page (scene-3d.html) or main scene page
+    const demoBtn = document.getElementById('demo-btn');
+    if (demoBtn) {
+      // We're on the diagram page - use different controls
+      this.initDiagramControls();
+      return;
+    }
+    
+    // Original controls for main scene page
     this.elements.playPauseBtn.addEventListener('click', () => {
       const isPlaying = this.sceneManager.rider.isPlaying;
       if (isPlaying) {
@@ -39,24 +49,29 @@ export class UIController {
       }
     });
     
-    this.elements.resetBtn.addEventListener('click', () => {
-      this.sceneManager.rider.reset();
-      this.elements.playPauseBtn.textContent = 'Play';
-    });
-    
-    this.elements.speedSlider.addEventListener('input', (e) => {
-      const val = parseFloat(e.target.value);
-      this.elements.speedValue.textContent = val.toFixed(1) + 'x';
-      // Adjust simulation speed in SceneManager
-      this.sceneManager.timeScale = val;
-    });
-    
-    this.elements.viewBtns.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const view = e.target.dataset.view;
-        this.sceneManager.setCameraView(view);
+    if (this.elements.resetBtn) {
+      this.elements.resetBtn.addEventListener('click', () => {
+        this.sceneManager.rider.reset();
+        this.elements.playPauseBtn.textContent = 'Play';
       });
-    });
+    }
+    
+    if (this.elements.speedSlider) {
+      this.elements.speedSlider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        this.elements.speedValue.textContent = val.toFixed(1) + 'x';
+        this.sceneManager.timeScale = val;
+      });
+    }
+    
+    if (this.elements.viewBtns) {
+      this.elements.viewBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const view = e.target.dataset.view;
+          this.sceneManager.setCameraView(view);
+        });
+      });
+    }
     
     // Environment
     const timeSlider = document.getElementById('time-slider');
@@ -81,26 +96,66 @@ export class UIController {
       windSlider.addEventListener('input', (e) => {
         const speed = parseInt(e.target.value);
         if(windDisplay) windDisplay.textContent = speed;
-        // Check if environment exists before trying to update it. Some views might not load it immediately.
         if (this.sceneManager && this.sceneManager.environment) {
             this.sceneManager.environment.setWindSpeed(speed);
         }
       });
     }
     
-    this.elements.togglePanelBtn.addEventListener('click', () => {
-      this.elements.panel.classList.toggle('collapsed');
-      this.elements.togglePanelBtn.innerHTML = this.elements.panel.classList.contains('collapsed') ? '+' : '&minus;';
-    });
+    if (this.elements.togglePanelBtn) {
+      this.elements.togglePanelBtn.addEventListener('click', () => {
+        this.elements.panel.classList.toggle('collapsed');
+        this.elements.togglePanelBtn.innerHTML = this.elements.panel.classList.contains('collapsed') ? '+' : '&minus;';
+      });
+    }
+  }
+  
+  initDiagramControls() {
+    // Controls for scene-3d.html (diagram page)
+    const demoBtn = document.getElementById('demo-btn');
+    const explodeSlider = document.getElementById('explode-slider');
+    const explodeVal = document.getElementById('explode-val');
+    const rotationSpeed = document.getElementById('rotation-speed');
+    const rotateVal = document.getElementById('rotate-val');
+    
+    if (demoBtn) {
+      demoBtn.addEventListener('click', () => {
+        const isPlaying = this.sceneManager.rider.isPlaying;
+        if (isPlaying) {
+          this.sceneManager.rider.pause();
+          demoBtn.innerHTML = '<span class="demo-icon">▶</span> Lancer la Démo';
+        } else {
+          this.sceneManager.rider.play();
+          demoBtn.innerHTML = '<span class="demo-icon">⏸</span> Pause';
+        }
+      });
+    }
+    
+    if (explodeSlider && explodeVal) {
+      explodeSlider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        explodeVal.textContent = Math.round(val * 100) + '%';
+        // TODO: Implement exploded view
+      });
+    }
+    
+    if (rotationSpeed && rotateVal) {
+      rotationSpeed.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        rotateVal.textContent = Math.round(val * 100) + '%';
+        // TODO: Implement auto-rotation
+      });
+    }
   }
   
   updateTelemetry(data) {
-    if(!this.elements.speed) return;
+    // Only update if telemetry elements exist
+    if(!this.elements.speed || !this.elements.speed.textContent === undefined) return;
     
-    this.elements.speed.textContent = data.speed.toFixed(1) + ' m/s';
-    this.elements.altitude.textContent = data.altitude.toFixed(1) + ' m';
-    this.elements.distance.textContent = Math.floor(data.distance) + ' m';
-    this.elements.tension.textContent = data.tension.toFixed(1) + ' kN';
-    this.elements.gForce.textContent = data.gForce.toFixed(2) + ' g';
+    if (this.elements.speed) this.elements.speed.textContent = data.speed.toFixed(1) + ' m/s';
+    if (this.elements.altitude) this.elements.altitude.textContent = data.altitude.toFixed(1) + ' m';
+    if (this.elements.distance) this.elements.distance.textContent = Math.floor(data.distance) + ' m';
+    if (this.elements.tension) this.elements.tension.textContent = data.tension.toFixed(1) + ' kN';
+    if (this.elements.gForce) this.elements.gForce.textContent = data.gForce.toFixed(2) + ' g';
   }
 }
