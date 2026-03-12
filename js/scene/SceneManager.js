@@ -26,8 +26,7 @@ export class SceneManager {
     this.performanceMonitor = null;
     
     this.timeScale = 1.0;
-    
-    this.timer = new THREE.Timer();
+    this.clock = new THREE.Clock();
     
     this.init();
   }
@@ -166,8 +165,7 @@ export class SceneManager {
   renderLoop() {
     requestAnimationFrame(this.renderLoop.bind(this));
     
-    this.timer.update();
-    const delta = this.timer.getDelta() * this.timeScale;
+    const delta = this.clock.getDelta() * this.timeScale;
     
     if (this.cameraController) this.cameraController.update();
     if (this.environment) this.environment.update(delta);
