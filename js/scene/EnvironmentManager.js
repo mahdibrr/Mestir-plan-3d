@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 
 export class EnvironmentManager {
   constructor(scene, renderer) {
@@ -16,6 +17,7 @@ export class EnvironmentManager {
     this.windSpeed = 10;
     
     this.setupLighting();
+    this.setupEnvironmentMap();
     this.setupParticles();
   }
   
@@ -26,25 +28,43 @@ export class EnvironmentManager {
     this.sunLight.shadow.mapSize.width = 4096;
     this.sunLight.shadow.mapSize.height = 4096;
     this.sunLight.shadow.camera.near = 0.5;
-    this.sunLight.shadow.camera.far = 1500;
+    this.sunLight.shadow.camera.far = 2000;
     
-    const d = 500;
+    const d = 1000;
     this.sunLight.shadow.camera.left = -d;
     this.sunLight.shadow.camera.right = d;
     this.sunLight.shadow.camera.top = d;
     this.sunLight.shadow.camera.bottom = -d;
+    this.sunLight.shadow.bias = -0.0001;
     
     this.scene.add(this.sunLight);
 
     // Ambient Hemisphere
-    this.hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x8B7D6B, 0.4);
+    this.hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x8B7D6B, 0.5);
     this.scene.add(this.hemiLight);
     
     // Fill light to alleviate harsh shadows
-    this.fillLight = new THREE.DirectionalLight(0xFFFFFF, 0.2);
+    this.fillLight = new THREE.DirectionalLight(0xFFFFFF, 0.3);
     this.scene.add(this.fillLight);
     
     this.updateTimeOfDay(this.timeOfDay);
+  }
+
+  setupEnvironmentMap() {
+    const pmremGenerator = new THREE.PMREMGenerator(this.renderer);
+    pmremGenerator.compileEquirectangularShader();
+
+    new RGBELoader()
+      .setPath('https://threejs.org/examples/textures/equirectangular/')
+      .load('royal_esplanade_1k.hdr', (texture) => {
+        const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+        this.scene.environment = envMap;
+        // Do NOT set background to envMap to avoid total whiteout if background is not intended to be the sky
+        // This scene uses this.scene.background = new THREE.Color(...) in SceneManager
+
+        texture.dispose();
+        pmremGenerator.dispose();
+      });
   }
   
   setupParticles() {
@@ -82,7 +102,7 @@ export class EnvironmentManager {
       this.sunLight.intensity = 0.1;
       this.hemiLight.intensity = 0.1;
       this.hemiLight.color.setHex(0x0a0a1a);
-      this.scene.background.setHex(0x020205);
+      this.scene.background = new THREE.Color(0x020205);
       this.scene.fog.color.setHex(0x020205);
     } else {
       // Day time
@@ -98,17 +118,17 @@ export class EnvironmentManager {
       if (hour >= 5 && hour < 8) {
         // Sunrise
         this.sunLight.color.setHex(0xffaa55);
-        this.scene.background.setHex(0xffaa55);
+        this.scene.background = new THREE.Color(0xffaa55);
         this.scene.fog.color.setHex(0xffaa55);
       } else if (hour >= 17 && hour <= 19) {
         // Sunset
         this.sunLight.color.setHex(0xff7733);
-        this.scene.background.setHex(0xff7733);
+        this.scene.background = new THREE.Color(0xff7733);
         this.scene.fog.color.setHex(0xff7733);
       } else {
         // Midday
         this.sunLight.color.setHex(0xffffe0);
-        this.scene.background.setHex(0x87CEEB);
+        this.scene.background = new THREE.Color(0x87CEEB);
         this.scene.fog.color.setHex(0x87CEEB);
       }
     }
@@ -124,9 +144,9 @@ export class EnvironmentManager {
     // Move particles based on wind
     const positions = this.particleSystem.geometry.attributes.position.array;
     for (let i = 0; i < positions.length; i += 3) {
-      positions[i] += this.windSpeed * delta * 2; // move X
-      if (positions[i] > 500) {
-        positions[i] = -500;
+      positions[i] += this.windSpeed * delta * 5; // move X faster for better wind feel
+      if (positions[i] > 1000) {
+        positions[i] = -1000;
       }
     }
     this.particleSystem.geometry.attributes.position.needsUpdate = true;

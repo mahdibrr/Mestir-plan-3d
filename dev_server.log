@@ -1,0 +1,23 @@
+
+> threejs-tyrolienne@1.0.0 dev
+> vite
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+  VITE v5.4.21  ready in 288 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+11:54:51 AM [vite] page reload experience-3d.html
+11:56:21 AM [vite] page reload js/scene/SceneManager.js
+11:56:26 AM [vite] ✨ new dependencies optimized: three/examples/jsm/postprocessing/EffectComposer.js, three/examples/jsm/postprocessing/RenderPass.js, three/examples/jsm/postprocessing/UnrealBloomPass.js, three/examples/jsm/postprocessing/OutputPass.js, three/examples/jsm/postprocessing/ShaderPass.js
+11:56:26 AM [vite] ✨ optimized dependencies changed. reloading
+11:57:31 AM [vite] page reload js/scene/SceneManager.js
+11:58:16 AM [vite] page reload js/scene/EnvironmentManager.js
+11:58:20 AM [vite] ✨ new dependencies optimized: three/examples/jsm/loaders/RGBELoader.js
+11:58:20 AM [vite] ✨ optimized dependencies changed. reloading
+11:59:05 AM [vite] page reload js/scene/SceneManager.js
+12:00:12 PM [vite] page reload js/scene/EnvironmentManager.js
+12:01:54 PM [vite] page reload technical-diagram.html
+12:02:12 PM [vite] page reload scene-3d.html
+12:02:16 PM [vite] page reload experience-3d.html

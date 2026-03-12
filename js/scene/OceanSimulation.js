@@ -31,26 +31,27 @@ export class OceanSimulation {
         varying float vElevation;
         varying vec3 vNormal;
         varying vec3 vPosition;
+        varying vec3 vWorldPosition;
         
         uniform float time;
         uniform float waveHeight;
         uniform float waveFrequency;
         
         void main() {
-          vUv = uv * 8.0; // Tile the texture
+          vUv = uv * 20.0; // Higher tiling for more detail
           vec3 pos = position;
           
-          // Multiple wave layers for realistic ocean
+          // Gerstner Waves approximation for sharper crests
           float wave1 = sin(pos.x * waveFrequency + time * 0.8) * waveHeight;
           float wave2 = cos(pos.y * waveFrequency * 0.7 + time * 1.2) * waveHeight * 0.6;
-          float wave3 = sin((pos.x + pos.y) * waveFrequency * 0.5 + time * 0.5) * waveHeight * 0.4;
-          float wave4 = cos((pos.x - pos.y) * waveFrequency * 0.3 + time * 0.9) * waveHeight * 0.3;
+          float wave3 = sin((pos.x + pos.y) * waveFrequency * 1.2 + time * 1.5) * waveHeight * 0.3;
           
-          float elevation = wave1 + wave2 + wave3 + wave4;
+          float elevation = wave1 + wave2 + wave3;
           pos.z += elevation;
           
           vElevation = elevation;
           vPosition = pos;
+          vWorldPosition = (modelMatrix * vec4(pos, 1.0)).xyz;
           vNormal = normal;
           
           gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
@@ -61,6 +62,7 @@ export class OceanSimulation {
         varying float vElevation;
         varying vec3 vNormal;
         varying vec3 vPosition;
+        varying vec3 vWorldPosition;
         
         uniform vec3 waterColor;
         uniform vec3 foamColor;
@@ -71,37 +73,40 @@ export class OceanSimulation {
         
         void main() {
           // Animated normal map for surface detail
-          vec2 uv1 = vUv + vec2(time * 0.02, time * 0.015);
-          vec2 uv2 = vUv * 0.7 - vec2(time * 0.015, time * 0.02);
+          vec2 uv1 = vUv + vec2(time * 0.05, time * 0.03);
+          vec2 uv2 = vUv * 0.5 - vec2(time * 0.04, time * 0.06);
           
           vec3 normal1 = texture2D(normalMap, uv1).rgb * 2.0 - 1.0;
           vec3 normal2 = texture2D(normalMap, uv2).rgb * 2.0 - 1.0;
-          vec3 normal = normalize(normal1 + normal2) * normalScale;
+          vec3 surfaceNormal = normalize(normal1 + normal2);
           
           // Fresnel effect for realistic water reflection
-          vec3 viewDirection = normalize(cameraPosition - vPosition);
-          float fresnel = pow(1.0 - max(dot(viewDirection, vNormal), 0.0), 3.0);
+          vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+          float fresnel = pow(1.0 - max(dot(viewDirection, vec3(0.0, 1.0, 0.0)), 0.0), 5.0);
           
           // Specular highlights from sun
-          vec3 reflectDir = reflect(-sunDirection, normal);
-          float specular = pow(max(dot(viewDirection, reflectDir), 0.0), 32.0);
+          vec3 reflectDir = reflect(-sunDirection, surfaceNormal);
+          float specular = pow(max(dot(viewDirection, reflectDir), 0.0), 128.0);
           
           // Wave crest foam
-          float foamMix = smoothstep(0.5, 1.5, vElevation) * 0.4;
+          float foamMix = smoothstep(0.8, 1.8, vElevation) * 0.6;
           
           // Combine effects
-          vec3 deepWater = waterColor * 0.8;
-          vec3 shallowWater = mix(waterColor, vec3(0.0, 0.4, 0.6), 0.3);
-          vec3 color = mix(deepWater, shallowWater, fresnel * 0.5);
+          vec3 deepColor = vec3(0.005, 0.05, 0.1);
+          vec3 shallowColor = vec3(0.1, 0.4, 0.5);
+
+          // Dynamic water color based on elevation and view angle
+          vec3 color = mix(deepColor, shallowColor, vElevation * 0.2 + 0.5);
+          color = mix(color, shallowColor * 1.5, fresnel);
           
           // Add foam to wave crests
           color = mix(color, foamColor, foamMix);
           
           // Add sun specular
-          color += vec3(1.0) * specular * 0.8;
+          color += vec3(1.0, 0.9, 0.7) * specular * 2.0;
           
-          // Slight transparency with depth-based opacity
-          float opacity = mix(0.85, 0.95, fresnel);
+          // Opacity
+          float opacity = 0.92;
           
           gl_FragColor = vec4(color, opacity);
         }

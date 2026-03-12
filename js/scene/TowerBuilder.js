@@ -18,21 +18,31 @@ export class TowerBuilder {
     this.departurePosition = new THREE.Vector3(200, 10, -50); 
     this.arrivalPosition = new THREE.Vector3(-250, 2, 150);
     
-    // Simple materials for Phase 2
+    // Enhanced PBR Materials
+    const textureLoader = new THREE.TextureLoader();
+
     this.steelMaterial = new THREE.MeshStandardMaterial({
       color: 0xB8C5D0,
-      roughness: 0.3,
-      metalness: 0.8
+      roughness: 0.15,
+      metalness: 1.0,
+      envMapIntensity: 1.5
     });
     
     this.concreteMaterial = new THREE.MeshStandardMaterial({
       color: 0x8B8680,
-      roughness: 0.8,
+      roughness: 0.9,
+      metalness: 0.0,
+      envMapIntensity: 0.5
     });
     
-    this.woodMaterial = new THREE.MeshStandardMaterial({
+    // Using MeshPhysicalMaterial for the wood to add some clearcoat (varnished look)
+    this.woodMaterial = new THREE.MeshPhysicalMaterial({
       color: 0x8B7355,
-      roughness: 0.7
+      roughness: 0.6,
+      metalness: 0.1,
+      clearcoat: 0.3,
+      clearcoatRoughness: 0.2,
+      envMapIntensity: 1.0
     });
   }
   

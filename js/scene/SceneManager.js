@@ -1,4 +1,9 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { CameraController } from './CameraController.js';
 import { TowerBuilder } from './TowerBuilder.js';
 import { TerrainGenerator } from './TerrainGenerator.js';
@@ -15,6 +20,8 @@ export class SceneManager {
     this.scene = null;
     this.camera = null;
     this.renderer = null;
+    this.composer = null;
+    this.godRaysParams = null;
     this.cameraController = null;
     
     this.towerBuilder = null;
@@ -27,7 +34,7 @@ export class SceneManager {
     
     this.timeScale = 1.0;
     
-    this.timer = new THREE.Timer();
+    this.clock = new THREE.Clock();
     
     this.init();
   }
@@ -37,6 +44,7 @@ export class SceneManager {
       this.setupRenderer();
       this.setupScene();
       this.setupCamera();
+      this.setupPostProcessing();
       
       this.cameraController = new CameraController(this.camera, this.renderer.domElement);
       
@@ -94,6 +102,93 @@ export class SceneManager {
     this.renderer.toneMappingExposure = 1.0;
     
     this.container.appendChild(this.renderer.domElement);
+  }
+
+  setupPostProcessing() {
+    this.setupGodRays();
+
+    const renderScene = new RenderPass(this.scene, this.camera);
+
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.5, // strength
+      0.4, // radius
+      0.85 // threshold
+    );
+
+    const outputPass = new OutputPass();
+
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(renderScene);
+    this.composer.addPass(bloomPass);
+    if (this.godRaysPass) this.composer.addPass(this.godRaysPass);
+    this.composer.addPass(outputPass);
+  }
+
+  setupGodRays() {
+    this.godRaysParams = {
+      enabled: true,
+      exposure: 0.6,
+      decay: 0.95,
+      density: 0.8,
+      weight: 0.4,
+      samples: 100
+    };
+
+    // Sun for God Rays
+    const sunGeometry = new THREE.SphereGeometry(20, 32, 32);
+    const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    this.sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
+    this.sunMesh.position.set(500, 300, -500);
+    this.scene.add(this.sunMesh);
+
+    // Implementation of Volumetric God Rays Pass
+    this.godRaysPass = new ShaderPass({
+      uniforms: {
+        tDiffuse: { value: null },
+        lightPosition: { value: new THREE.Vector2(0.5, 0.5) },
+        exposure: { value: 0.15 },
+        decay: { value: 0.95 },
+        density: { value: 0.8 },
+        weight: { value: 0.4 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform sampler2D tDiffuse;
+        uniform vec2 lightPosition;
+        uniform float exposure;
+        uniform float decay;
+        uniform float density;
+        uniform float weight;
+
+        const int SAMPLES = 64;
+
+        void main() {
+          vec2 deltaTexCoord = (vUv - lightPosition);
+          deltaTexCoord *= 1.0 / float(SAMPLES) * density;
+          vec4 color = texture2D(tDiffuse, vUv);
+          float illuminationDecay = 1.0;
+          vec2 coord = vUv;
+
+          for (int i = 0; i < SAMPLES; i++) {
+            coord -= deltaTexCoord;
+            vec4 texSample = texture2D(tDiffuse, coord);
+            texSample *= illuminationDecay * weight;
+            color += texSample;
+            illuminationDecay *= decay;
+          }
+
+          gl_FragColor = color * exposure;
+        }
+      `
+    });
   }
 
   showWebGLError(error) {
@@ -160,14 +255,26 @@ export class SceneManager {
       this.camera.aspect = window.innerWidth / window.innerHeight;
       this.camera.updateProjectionMatrix();
       this.renderer.setSize(window.innerWidth, window.innerHeight);
+      if (this.composer) this.composer.setSize(window.innerWidth, window.innerHeight);
     });
   }
 
   renderLoop() {
     requestAnimationFrame(this.renderLoop.bind(this));
     
-    this.timer.update();
-    const delta = this.timer.getDelta() * this.timeScale;
+    if (this.sunMesh && this.environment && this.environment.sunLight) {
+        this.sunMesh.position.copy(this.environment.sunLight.position).normalize().multiplyScalar(1000);
+
+        if (this.godRaysPass) {
+          const screenPos = this.sunMesh.position.clone().project(this.camera);
+          this.godRaysPass.uniforms.lightPosition.value.set(
+            (screenPos.x + 1) / 2,
+            (screenPos.y + 1) / 2
+          );
+        }
+    }
+
+    const delta = this.clock.getDelta() * this.timeScale;
     
     if (this.cameraController) this.cameraController.update();
     if (this.environment) this.environment.update(delta);
@@ -181,7 +288,11 @@ export class SceneManager {
       }
     }
     
-    this.renderer.render(this.scene, this.camera);
+    if (this.composer) {
+      this.composer.render();
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 }
 

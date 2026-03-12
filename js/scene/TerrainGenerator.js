@@ -8,8 +8,9 @@ export class TerrainGenerator {
     // Setup Materials
     this.terrainMat = new THREE.MeshStandardMaterial({
         vertexColors: true,
-        roughness: 0.8,
-        metalness: 0.1
+        roughness: 0.9,
+        metalness: 0.05,
+        envMapIntensity: 0.5
     });
   }
   
@@ -190,7 +191,9 @@ export class TerrainGenerator {
 
       const rockMat = new THREE.MeshStandardMaterial({
           color: 0x8b7d6b,
-          roughness: 0.9,
+          roughness: 0.95,
+          metalness: 0.0,
+          envMapIntensity: 0.5
       });
 
       const instancedMesh = new THREE.InstancedMesh(rockGeo, rockMat, maxRocks);
@@ -220,9 +223,12 @@ export class TerrainGenerator {
       const buildingGeo = new THREE.BoxGeometry(1, 1, 1);
       buildingGeo.translate(0, 0.5, 0); // Ground anchor
       
-      const buildingMat = new THREE.MeshStandardMaterial({
+      const buildingMat = new THREE.MeshPhysicalMaterial({
           color: 0xecf0f1,
-          roughness: 0.6
+          roughness: 0.5,
+          metalness: 0.1,
+          clearcoat: 0.1,
+          envMapIntensity: 1.0
       });
       
       const instancedMesh = new THREE.InstancedMesh(buildingGeo, buildingMat, maxBuildings);
