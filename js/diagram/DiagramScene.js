@@ -1,5 +1,11 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 
 export class DiagramScene {
   constructor(id) {
@@ -21,6 +27,7 @@ export class DiagramScene {
       this.setupRenderer();
       this.setupScene();
       this.setupCamera();
+      this.setupPostProcessing();
       this.setupControls();
       this.buildAll();
       this.setupRaycaster();
@@ -44,8 +51,79 @@ export class DiagramScene {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.toneMappingExposure = 1.2;
     this.container.appendChild(this.renderer.domElement);
+  }
+
+  setupPostProcessing() {
+    // Post-processing
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.4, 0.4, 0.85);
+    this.composer.addPass(this.bloomPass);
+
+    // Innovative Feature: Volumetric God Rays (Radial Blur)
+    this.setupGodRays();
+
+    this.composer.addPass(new OutputPass());
+  }
+
+  setupGodRays() {
+    const godRaysShader = {
+      uniforms: {
+        tDiffuse: { value: null },
+        uSunPosition: { value: new THREE.Vector2(0.5, 0.5) },
+        uStrength: { value: 0.008 },
+        uSamples: { value: 40 }
+      },
+      vertexShader: `
+        out vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        precision highp float;
+        uniform sampler2D tDiffuse;
+        uniform vec2 uSunPosition;
+        uniform float uStrength;
+        uniform int uSamples;
+        in vec2 vUv;
+        out vec4 pc_fragColor;
+
+        void main() {
+          vec2 delta = (vUv - uSunPosition);
+          float distanceToSun = length(delta);
+          vec2 dir = delta / float(uSamples) * uStrength;
+
+          // Initial color sample
+          vec4 color = texture(tDiffuse, vUv);
+          vec2 uv = vUv;
+
+          // Radial blur with distance-based falloff
+          for(int i = 0; i < 40; i++) {
+            uv -= dir;
+            color += texture(tDiffuse, uv);
+          }
+
+          vec4 radialColor = color / float(uSamples);
+
+          // Masking: Only apply God Rays where the scene is bright (bloom-like)
+          // and add a distance falloff from the sun source
+          float brightness = dot(radialColor.rgb, vec3(0.299, 0.587, 0.114));
+          float mask = smoothstep(0.1, 0.8, brightness);
+          float falloff = smoothstep(0.8, 0.0, distanceToSun);
+
+          pc_fragColor = mix(texture(tDiffuse, vUv), radialColor, mask * falloff * 0.5);
+        }
+      `
+    };
+
+    this.godRaysPass = new ShaderPass(godRaysShader);
+    this.godRaysPass.material.glslVersion = THREE.GLSL3;
+    this.composer.addPass(this.godRaysPass);
   }
 
   showWebGLError(error) {
@@ -90,6 +168,15 @@ export class DiagramScene {
     this.scene.background = new THREE.Color(0x060a14);
     this.scene.fog = new THREE.FogExp2(0x060a14, 0.0018);
 
+    // Load HDR Environment
+    new RGBELoader()
+      .load('https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/equirectangular/blouberg_sunrise_2_1k.hdr', (texture) => {
+        texture.mapping = THREE.EquirectangularReflectionMapping;
+        this.scene.environment = texture;
+        // Optionally set as background if it looks good, otherwise keep dark color
+        // this.scene.background = texture;
+      });
+
     // Subtle grid
     const grid = new THREE.GridHelper(400, 80, 0x003355, 0x0a1a2a);
     grid.position.y = -0.5;
@@ -132,9 +219,17 @@ export class DiagramScene {
     this.controls.autoRotateSpeed = 0.3;
   }
 
-  // Material helper
+  // Material helper (PBR Upgrade)
   M(color, metal = 0.3, rough = 0.6, extra = {}) {
-    return new THREE.MeshStandardMaterial({ color, metalness: metal, roughness: rough, ...extra });
+    return new THREE.MeshPhysicalMaterial({
+      color,
+      metalness: metal,
+      roughness: rough,
+      envMapIntensity: 1.0,
+      clearcoat: extra.clearcoat || 0,
+      clearcoatRoughness: extra.clearcoatRoughness || 0,
+      ...extra
+    });
   }
 
   // Add component
@@ -176,11 +271,61 @@ export class DiagramScene {
 
   // ===== OCEAN =====
   buildOcean() {
-    const geo = new THREE.PlaneGeometry(500, 500, 60, 60);
-    const mat = this.M(0x0a3d5c, 0.1, 0.3, {
-      transparent: true, opacity: 0.7, side: THREE.DoubleSide
+    const geo = new THREE.PlaneGeometry(1000, 1000, 128, 128);
+
+    this.oceanMaterial = new THREE.ShaderMaterial({
+      glslVersion: THREE.GLSL3,
+      uniforms: {
+        uTime: { value: 0 },
+        uColor: { value: new THREE.Color(0x0a3d5c) },
+        uDeepColor: { value: new THREE.Color(0x02101a) },
+        uHorizonColor: { value: new THREE.Color(0x1e5b8a) }
+      },
+      vertexShader: `
+        out vec2 vUv;
+        out float vHeight;
+        uniform float uTime;
+
+        void main() {
+          vUv = uv;
+          vec3 pos = position;
+
+          // Gerstner Wave approximation
+          float h = sin(pos.x * 0.05 + uTime * 1.2) * 0.8;
+          h += cos(pos.y * 0.04 + uTime * 0.8) * 0.6;
+          h += sin((pos.x + pos.y) * 0.02 + uTime * 1.5) * 0.4;
+
+          pos.z += h;
+          vHeight = h;
+
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }
+      `,
+      fragmentShader: `
+        precision highp float;
+        in vec2 vUv;
+        in float vHeight;
+        out vec4 pc_fragColor;
+        uniform vec3 uColor;
+        uniform vec3 uDeepColor;
+        uniform vec3 uHorizonColor;
+
+        void main() {
+          float mixHeight = (vHeight + 1.5) / 3.0;
+          vec3 color = mix(uDeepColor, uColor, mixHeight);
+
+          // Subtle Fresnel/Horizon mix
+          float edge = 1.0 - pow(vUv.y, 3.0);
+          color = mix(color, uHorizonColor, edge * 0.3);
+
+          pc_fragColor = vec4(color, 0.85);
+        }
+      `,
+      transparent: true,
+      side: THREE.DoubleSide
     });
-    const ocean = new THREE.Mesh(geo, mat);
+
+    const ocean = new THREE.Mesh(geo, this.oceanMaterial);
     ocean.rotation.x = -Math.PI / 2;
     ocean.position.set(0, -4, 55);
     ocean.userData = { isOcean: true };
@@ -231,101 +376,87 @@ export class DiagramScene {
     }
   }
 
-  // ===== LATTICE TOWER (28m) =====
+  // ===== LATTICE TOWER (28m) - Optimized with InstancedMesh =====
   buildLatticeTower() {
-    const legMat = this.M(0x00D9FF, 0.85, 0.25);
-    const braceMat = this.M(0x0099BB, 0.8, 0.3);
-    const ringMat = this.M(0x006688, 0.75, 0.35);
-    const towerH = 28;
-    const baseW = 4.2;  // half-width at base
-    const topW = 1.8;   // half-width at top (taper)
-    const levels = 14;  // number of brace sections
-    const segH = towerH / levels;
-    const yBase = 3.6;
-
-    // Taper function: returns half-width at height fraction t (0=base, 1=top)
+    const legMat = this.M(0x00D9FF, 0.9, 0.15, { clearcoat: 1.0, clearcoatRoughness: 0.1 });
+    const braceMat = this.M(0x0099BB, 0.85, 0.2, { clearcoat: 0.5 });
+    const ringMat = this.M(0x006688, 0.8, 0.25);
+    const towerH = 28, baseW = 4.2, topW = 1.8, levels = 14, yBase = 3.6;
     const w = (t) => baseW + (topW - baseW) * t;
-
-    // 4 leg corners
     const corners = [[1,1],[-1,1],[-1,-1],[1,-1]];
+    const faces = [[0,1],[1,2],[2,3],[3,0]];
 
-    // Build legs as segmented tubes
-    corners.forEach((c, ci) => {
+    // Geometries
+    const legGeo = new THREE.CylinderGeometry(0.28, 0.28, 1, 6);
+    const braceGeo = new THREE.CylinderGeometry(0.06, 0.06, 1, 6);
+    const ringGeo = new THREE.CylinderGeometry(0.07, 0.07, 1, 6);
+
+    // Instances counts
+    const legCount = 4 * levels;
+    const braceCount = 4 * levels * 2;
+    const ringCount = 4 * (levels + 1);
+
+    const legIM = new THREE.InstancedMesh(legGeo, legMat, legCount);
+    const braceIM = new THREE.InstancedMesh(braceGeo, braceMat, braceCount);
+    const ringIM = new THREE.InstancedMesh(ringGeo, ringMat, ringCount);
+
+    let legIdx = 0, braceIdx = 0, ringIdx = 0;
+    const dummy = new THREE.Object3D();
+
+    // Legs
+    corners.forEach((c) => {
       for (let i = 0; i < levels; i++) {
         const t0 = i / levels, t1 = (i + 1) / levels;
         const w0 = w(t0), w1 = w(t1);
         const y0 = yBase + t0 * towerH, y1 = yBase + t1 * towerH;
         const a = new THREE.Vector3(c[0] * w0, y0, c[1] * w0);
         const b = new THREE.Vector3(c[0] * w1, y1, c[1] * w1);
-        const seg = this.tube(a, b, 0.28, legMat);
-        if (i === 0 && ci === 0) {
-          this.add(seg, 'Pieds Principaux (×4)', 'pieds',
-            `<b>Acier :</b> S355J2 (355 MPa)<br/><b>Profil :</b> Tube □200×200 ép.10mm<br/><b>Hauteur :</b> 28m<br/><b>Protection :</b> Galva. + époxy<br/><b>Corrosion :</b> Classe C4`,
-            new THREE.Vector3(c[0], 0, c[1]).normalize());
-        } else {
-          seg.userData = { component: 'pieds', explodeDir: new THREE.Vector3(c[0], 0, c[1]).normalize(), basePosition: seg.position.clone() };
-          seg.castShadow = true;
-          this.components.push(seg);
-          this.scene.add(seg);
-        }
+        this.setInstanceFromPoints(legIM, legIdx++, a, b, dummy);
       }
     });
 
-    // X-bracing on each face
-    const faces = [[0,1],[1,2],[2,3],[3,0]];
-    let firstBrace = true;
+    // Braces
     faces.forEach(([a, b]) => {
       for (let i = 0; i < levels; i++) {
         const t0 = i / levels, t1 = (i + 1) / levels;
         const w0 = w(t0), w1 = w(t1);
         const y0 = yBase + t0 * towerH, y1 = yBase + t1 * towerH;
         const ca = corners[a], cb = corners[b];
-        // Diagonal 1
-        const p1 = new THREE.Vector3(ca[0] * w0, y0, ca[1] * w0);
-        const p2 = new THREE.Vector3(cb[0] * w1, y1, cb[1] * w1);
-        const d1 = this.tube(p1, p2, 0.06, braceMat);
-        // Diagonal 2
-        const p3 = new THREE.Vector3(cb[0] * w0, y0, cb[1] * w0);
-        const p4 = new THREE.Vector3(ca[0] * w1, y1, ca[1] * w1);
-        const d2 = this.tube(p3, p4, 0.06, braceMat);
-
-        const mid = new THREE.Vector3((ca[0]+cb[0])/2, 0, (ca[1]+cb[1])/2).normalize().multiplyScalar(0.4);
-        if (firstBrace) {
-          this.add(d1, 'Contreventement en X', 'contreventement',
-            `<b>Acier :</b> S275J0<br/><b>Profil :</b> Cornière L60×6mm<br/><b>Disposition :</b> X, ${levels} niveaux × 4 faces<br/><b>Boulons :</b> M24 Gr.8.8<br/><b>Rôle :</b> Stabilité vent + séisme`,
-            mid);
-          firstBrace = false;
-        } else {
-          d1.userData = { component: 'contreventement', explodeDir: mid, basePosition: d1.position.clone() };
-          d1.castShadow = true; this.components.push(d1); this.scene.add(d1);
-        }
-        d2.userData = { component: 'contreventement', explodeDir: mid, basePosition: d2.position.clone() };
-        d2.castShadow = true; this.components.push(d2); this.scene.add(d2);
+        this.setInstanceFromPoints(braceIM, braceIdx++, new THREE.Vector3(ca[0]*w0, y0, ca[1]*w0), new THREE.Vector3(cb[0]*w1, y1, cb[1]*w1), dummy);
+        this.setInstanceFromPoints(braceIM, braceIdx++, new THREE.Vector3(cb[0]*w0, y0, cb[1]*w0), new THREE.Vector3(ca[0]*w1, y1, ca[1]*w1), dummy);
       }
     });
 
-    // Horizontal rings at each level
-    let firstRing = true;
+    // Rings
     for (let i = 0; i <= levels; i++) {
-      const t = i / levels;
-      const ww = w(t);
-      const y = yBase + t * towerH;
+      const t = i / levels, ww = w(t), y = yBase + t * towerH;
       faces.forEach(([a, b]) => {
         const ca = corners[a], cb = corners[b];
-        const pa = new THREE.Vector3(ca[0] * ww, y, ca[1] * ww);
-        const pb = new THREE.Vector3(cb[0] * ww, y, cb[1] * ww);
-        const ring = this.tube(pa, pb, 0.07, ringMat);
-        if (firstRing) {
-          this.add(ring, 'Anneaux Horizontaux (×15)', 'anneaux',
-            `<b>Acier :</b> S275J0<br/><b>Profil :</b> Tube □100×100mm<br/><b>Niveaux :</b> ${levels + 1}<br/><b>Rôle :</b> Raidisseur anti-flambement`,
-            new THREE.Vector3(0, 0.2, 0));
-          firstRing = false;
-        } else {
-          ring.userData = { component: 'anneaux', explodeDir: new THREE.Vector3(0, 0.2, 0), basePosition: ring.position.clone() };
-          ring.castShadow = true; this.components.push(ring); this.scene.add(ring);
-        }
+        this.setInstanceFromPoints(ringIM, ringIdx++, new THREE.Vector3(ca[0]*ww, y, ca[1]*ww), new THREE.Vector3(cb[0]*ww, y, cb[1]*ww), dummy);
       });
     }
+
+    [legIM, braceIM, ringIM].forEach(im => {
+      im.castShadow = true;
+      im.receiveShadow = true;
+      this.scene.add(im);
+    });
+
+    // Add metadata for UI
+    this.add(new THREE.Mesh(new THREE.BoxGeometry(baseW*2, towerH, baseW*2), new THREE.MeshBasicMaterial({visible:false})),
+      'Pylône en Treillis (Optimisé)', 'pieds',
+      `<b>Optimisation :</b> InstancedMesh (3 draw calls)<br/><b>Acier :</b> S355J2<br/><b>Hauteur :</b> 28m<br/><b>Poids total :</b> ~12.5 t`,
+      new THREE.Vector3(0, 0, 0));
+  }
+
+  setInstanceFromPoints(im, idx, a, b, dummy) {
+    const dir = new THREE.Vector3().subVectors(b, a);
+    const len = dir.length();
+    dummy.position.copy(a).add(dir.clone().multiplyScalar(0.5));
+    dummy.scale.set(1, len, 1);
+    dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    dummy.updateMatrix();
+    im.setMatrixAt(idx, dummy.matrix);
   }
 
   // ===== STAIRCASE =====
@@ -456,7 +587,7 @@ export class DiagramScene {
     const endY = 6.0;     // exact arrival post top
     const sag = 6;        // realistic sag for 550m span
 
-    const makeCatenary = (offsetX, r, color, name, comp, specs, store) => {
+    const makeCatenary = (offsetX, r, color, name, comp, specs, store, extraMat = {}) => {
       const pts = [];
       const N = 120;
       for (let i = 0; i <= N; i++) {
@@ -469,7 +600,7 @@ export class DiagramScene {
       const curve = new THREE.CatmullRomCurve3(pts);
       if (store) this.cableCurve = curve;
       const geo = new THREE.TubeGeometry(curve, 150, r, 8, false);
-      const mesh = new THREE.Mesh(geo, this.M(color, 0.9, 0.2));
+      const mesh = new THREE.Mesh(geo, this.M(color, 0.9, 0.2, extraMat));
       this.add(mesh, name, comp, specs, new THREE.Vector3(0, 1, 0));
       for (let j = 1; j < 10; j++) {
         const pt = curve.getPoint(j / 10);
@@ -479,10 +610,12 @@ export class DiagramScene {
     };
 
     makeCatenary(0, 0.14, 0xcccccc, 'Câble Principal Ø16mm', 'cable-principal',
-      `<b>Acier :</b> Galvanisé, 19 torons × 7 fils<br/><b>Ø :</b> 16mm<br/><b>Rupture :</b> 157 kN (1770 MPa)<br/><b>Portée :</b> 550m<br/><b>Flèche :</b> 15m<br/><b>Tension max :</b> 45 kN<br/><b>Sécurité :</b> ×3.5<br/><b>Courbe :</b> Caténaire<br/><b>Pinces :</b> Tous les 50m`, true);
+      `<b>Acier :</b> Galvanisé, 19 torons × 7 fils<br/><b>Ø :</b> 16mm<br/><b>Rupture :</b> 157 kN (1770 MPa)<br/><b>Portée :</b> 550m<br/><b>Flèche :</b> 15m<br/><b>Tension max :</b> 45 kN<br/><b>Sécurité :</b> ×3.5<br/><b>Courbe :</b> Caténaire<br/><b>Pinces :</b> Tous les 50m`, true,
+      { metalness: 1.0, roughness: 0.1, clearcoat: 1.0 });
 
     makeCatenary(1.2, 0.09, 0xff4444, 'Câble de Sécurité Ø12mm', 'cable-securite',
-      `<b>Acier :</b> Galvanisé Ø12mm<br/><b>Rupture :</b> 90 kN<br/><b>Rôle :</b> Redondance<br/><b>Norme :</b> EN 12927`, false);
+      `<b>Acier :</b> Galvanisé Ø12mm<br/><b>Rupture :</b> 90 kN<br/><b>Rôle :</b> Redondance<br/><b>Norme :</b> EN 12927`, false,
+      { metalness: 0.8, roughness: 0.3 });
   }
 
   // ===== PULLEY, HARNESS & RIDER =====
@@ -723,21 +856,28 @@ export class DiagramScene {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.composer.setSize(window.innerWidth, window.innerHeight);
   }
 
   animate() {
       requestAnimationFrame(() => this.animate());
+
+      // Update Sun Position for God Rays
+      if (this.godRaysPass) {
+        const sunPos = new THREE.Vector3(100, 150, 80);
+        sunPos.project(this.camera);
+        this.godRaysPass.uniforms.uSunPosition.value.set(
+          (sunPos.x + 1) / 2,
+          (sunPos.y + 1) / 2
+        );
+      }
+
       const dt = this.clock.getDelta();
       const t = this.clock.getElapsedTime();
 
-      // Ocean waves
-      if (this.ocean) {
-        const pos = this.ocean.geometry.attributes.position;
-        for (let i = 0; i < pos.count; i++) {
-          const x = pos.getX(i), y = pos.getY(i);
-          pos.setZ(i, Math.sin(x * 0.08 + t) * 0.4 + Math.cos(y * 0.06 + t * 0.7) * 0.3);
-        }
-        pos.needsUpdate = true;
+      // Ocean waves (GPU)
+      if (this.oceanMaterial) {
+        this.oceanMaterial.uniforms.uTime.value = t;
       }
       // Rider demo animation
       if (this.demoRunning && this.cableCurve) {
@@ -767,7 +907,11 @@ export class DiagramScene {
         if (ea) ea.textContent = alt + ' m';
       }
       this.controls.update();
-      this.renderer.render(this.scene, this.camera);
+      if (this.composer) {
+        this.composer.render();
+      } else {
+        this.renderer.render(this.scene, this.camera);
+      }
     }
 }
 
