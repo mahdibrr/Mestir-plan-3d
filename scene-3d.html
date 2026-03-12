@@ -1,60 +1,535 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>3D Scene - Tyrolienne Monastir</title>
+  <title>Schéma Technique - Tyrolienne Monastir</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/main.css">
-  <link rel="stylesheet" href="/css/scene.css">
+  <style>
+    body {
+      overflow: hidden;
+      margin: 0;
+      background: #07090f;
+      font-family: 'Outfit', sans-serif;
+    }
+
+    /* Back Button */
+    .back-btn {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+      background: rgba(13, 17, 23, 0.7);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: #fff;
+      padding: 0.6rem 1.2rem;
+      border-radius: 30px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.3s ease;
+    }
+
+    .back-btn:hover {
+      background: rgba(0, 217, 255, 0.15);
+      border-color: #00D9FF;
+      color: #00D9FF;
+    }
+
+    /* Title Bar */
+    .title-bar {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      background: rgba(13, 17, 23, 0.75);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 0.8rem 2rem;
+      text-align: center;
+    }
+
+    .title-bar h1 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: 1px;
+    }
+
+    .title-bar h1 span {
+      color: #00D9FF;
+    }
+
+    .title-bar p {
+      font-size: 0.75rem;
+      color: #a0a8b5;
+      margin-top: 2px;
+    }
+
+    /* Controls Panel */
+    .controls-panel {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      z-index: 1000;
+      width: 300px;
+      background: rgba(8, 12, 24, 0.92);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(0, 217, 255, 0.08);
+      border-radius: 16px;
+      color: #fff;
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    }
+
+    .controls-panel::-webkit-scrollbar {
+      width: 3px;
+    }
+
+    .controls-panel::-webkit-scrollbar-thumb {
+      background: rgba(0, 217, 255, 0.25);
+      border-radius: 2px;
+    }
+
+    /* Sections */
+    .cp-section {
+      padding: 1rem 1.2rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .cp-section:last-child {
+      border-bottom: none;
+    }
+
+    .cp-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #7a8599;
+      margin-bottom: 0.8rem;
+    }
+
+    .cp-badge {
+      margin-left: auto;
+      background: rgba(0, 217, 255, 0.12);
+      color: #00D9FF;
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-weight: 700;
+    }
+
+    /* Sliders */
+    .cp-row {
+      margin-bottom: 0.8rem;
+    }
+
+    .cp-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .cp-slider-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+      color: #a0a8b5;
+      margin-bottom: 4px;
+      font-weight: 500;
+    }
+
+    .cp-val {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #00D9FF;
+      background: rgba(0, 217, 255, 0.08);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    .cp-row input[type="range"] {
+      width: 100%;
+      accent-color: #00D9FF;
+      height: 4px;
+    }
+
+    /* Demo Button */
+    #demo-btn {
+      width: 100%;
+      padding: 0.65rem;
+      margin-bottom: 0.7rem;
+      background: linear-gradient(135deg, #00D9FF 0%, #0077aa 100%);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      box-shadow: 0 4px 15px rgba(0, 217, 255, 0.2);
+    }
+
+    #demo-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0, 217, 255, 0.35);
+    }
+
+    #demo-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .demo-icon {
+      font-size: 0.75rem;
+    }
+
+    /* Telemetry */
+    #telemetry {
+      display: none;
+      background: rgba(0, 217, 255, 0.04);
+      border: 1px solid rgba(0, 217, 255, 0.1);
+      border-radius: 8px;
+      padding: 0.5rem 0.7rem;
+      font-size: 0.75rem;
+    }
+
+    .tel-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 3px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .tel-row:last-child {
+      border-bottom: none;
+    }
+
+    .tel-label {
+      color: #667;
+      font-weight: 600;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .tel-value {
+      color: #00D9FF;
+      font-weight: 700;
+      font-family: 'Outfit', monospace;
+    }
+
+    /* Legend */
+    .legend-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .lg-group {
+      margin-bottom: 2px;
+    }
+
+    .lg-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      color: #445;
+      margin-bottom: 4px;
+      padding-left: 2px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 3px 6px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-size: 0.75rem;
+    }
+
+    .legend-item:hover {
+      background: rgba(0, 217, 255, 0.08);
+    }
+
+    .legend-item span {
+      color: #bbb;
+      font-weight: 500;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      flex-shrink: 0;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Detail Panel */
+    .cp-detail #component-data {
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 8px;
+      padding: 0.8rem;
+      min-height: 70px;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+    }
+
+    .detail-title {
+      color: #00D9FF;
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+
+    .detail-specs {
+      color: #8899aa;
+      font-size: 0.75rem;
+      line-height: 1.7;
+    }
+
+    .detail-placeholder {
+      color: #445;
+      font-style: italic;
+      font-size: 0.75rem;
+    }
+
+    /* Bottom Stats */
+    .bottom-stats {
+      position: absolute;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      display: flex;
+      gap: 1rem;
+    }
+
+    .stat-chip {
+      background: rgba(8, 12, 24, 0.88);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 217, 255, 0.08);
+      border-radius: 10px;
+      padding: 0.5rem 1rem;
+      text-align: center;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    .stat-chip .val {
+      font-size: 1rem;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .stat-chip .val span {
+      color: #00D9FF;
+      font-size: 0.7rem;
+    }
+
+    .stat-chip .lbl {
+      font-size: 0.6rem;
+      color: #667;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .controls-panel {
+        display: none;
+      }
+
+      .title-bar h1 {
+        font-size: 0.9rem;
+      }
+
+      .bottom-stats {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+    }
+  </style>
 </head>
-<body style="overflow: hidden;"> <!-- Prevent scroll on 3D canvas -->
-  <!-- Back Button overlay -->
-  <a href="/" class="btn btn-secondary" style="position: absolute; top: 20px; left: 20px; z-index: 1000; padding: 0.5rem 1rem;">
-    &larr; Back to Home
-  </a>
-  
-  <!-- Overlay Controls Panel -->
-  <div class="controls-panel glass-panel">
-    <div class="panel-header">
-      <h3>Controls</h3>
-      <button id="toggle-panel" class="btn-outline">&minus;</button>
+
+<body>
+  <a href="/" class="back-btn">&larr; Retour</a>
+
+  <div class="title-bar">
+    <h1>Schéma Technique <span>Tyrolienne</span></h1>
+    <p>Vue Isométrique 3D Interactive — Monastir, Tunisie</p>
+  </div>
+
+  <div class="controls-panel">
+    <!-- Section: Controls -->
+    <div class="cp-section">
+      <div class="cp-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00D9FF" stroke-width="2">
+          <path
+            d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+        </svg>
+        <span>Contrôles</span>
+      </div>
+      <div class="cp-row">
+        <div class="cp-slider-label">
+          <span>Vue Éclatée</span>
+          <span class="cp-val" id="explode-val">0%</span>
+        </div>
+        <input type="range" id="explode-slider" min="0" max="1" step="0.01" value="0">
+      </div>
+      <div class="cp-row">
+        <div class="cp-slider-label">
+          <span>Rotation Auto</span>
+          <span class="cp-val" id="rotate-val">15%</span>
+        </div>
+        <input type="range" id="rotation-speed" min="0" max="1" step="0.01" value="0.15">
+      </div>
     </div>
-    <div class="panel-content">
-      <div class="control-group">
-        <h4>Animation</h4>
-        <div style="display:flex; gap:10px; margin-bottom:10px;">
-          <button id="play-pause" class="btn btn-primary" style="padding: 0.5rem 1rem">Play</button>
-          <button id="reset" class="btn btn-secondary" style="padding: 0.5rem 1rem">Reset</button>
-        </div>
-        <label>Speed: <span id="speed-value" style="float:right; color:#00D9FF;">1.0x</span></label>
-        <input type="range" id="speed-slider" min="0.1" max="3" step="0.1" value="1">
+
+    <!-- Section: Demo -->
+    <div class="cp-section">
+      <div class="cp-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00D9FF" stroke-width="2">
+          <polygon points="5 3 19 12 5 21 5 3" />
+        </svg>
+        <span>Simulation</span>
       </div>
-      
-      <div class="control-group">
-        <h4>Camera Views</h4>
-        <div style="display:flex; flex-wrap:wrap; gap:5px;">
-          <button class="view-btn btn-secondary" style="padding: 0.4rem 0.6rem; font-size:0.8rem" data-view="overview">Overview</button>
-          <button class="view-btn btn-secondary" style="padding: 0.4rem 0.6rem; font-size:0.8rem" data-view="tower">Tower</button>
-          <button class="view-btn btn-secondary" style="padding: 0.4rem 0.6rem; font-size:0.8rem" data-view="cable">Cable</button>
+      <button id="demo-btn">
+        <span class="demo-icon">▶</span> Lancer la Démo
+      </button>
+     
+    </div>
+
+    <!-- Section: Legend -->
+    <div class="cp-section">
+      <div class="cp-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00D9FF" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" />
+          <rect x="14" y="3" width="7" height="7" />
+          <rect x="3" y="14" width="7" height="7" />
+          <rect x="14" y="14" width="7" height="7" />
+        </svg>
+        <span>Composants</span>
+        <span class="cp-badge">15</span>
+      </div>
+      <div class="legend-grid">
+        <div class="lg-group">
+          <div class="lg-title">Structure</div>
+          <div class="legend-item" data-component="fondation">
+            <div class="legend-dot" style="background:#808080;"></div><span>Fondation Béton</span>
+          </div>
+          <div class="legend-item" data-component="pieds">
+            <div class="legend-dot" style="background:#00D9FF;"></div><span>Pieds Principaux ×4</span>
+          </div>
+          <div class="legend-item" data-component="contreventement">
+            <div class="legend-dot" style="background:#0099BB;"></div><span>Contreventement</span>
+          </div>
+          <div class="legend-item" data-component="anneaux">
+            <div class="legend-dot" style="background:#006688;"></div><span>Anneaux Horizontaux</span>
+          </div>
+          <div class="legend-item" data-component="escalier">
+            <div class="legend-dot" style="background:#888800;"></div><span>Escalier Colimaçon</span>
+          </div>
+        </div>
+        <div class="lg-group">
+          <div class="lg-title">Plateforme</div>
+          <div class="legend-item" data-component="plateforme">
+            <div class="legend-dot" style="background:#FFaa00;"></div><span>Plateforme</span>
+          </div>
+          <div class="legend-item" data-component="garde-corps">
+            <div class="legend-dot" style="background:#FFcc44;"></div><span>Garde-Corps</span>
+          </div>
+        </div>
+        <div class="lg-group">
+          <div class="lg-title">Câblage</div>
+          <div class="legend-item" data-component="cable-principal">
+            <div class="legend-dot" style="background:#cccccc;"></div><span>Câble Principal Ø16</span>
+          </div>
+          <div class="legend-item" data-component="cable-securite">
+            <div class="legend-dot" style="background:#ff4444;"></div><span>Câble Sécurité Ø12</span>
+          </div>
+          <div class="legend-item" data-component="haubans">
+            <div class="legend-dot" style="background:#FFD700;"></div><span>Haubans ×9</span>
+          </div>
+        </div>
+        <div class="lg-group">
+          <div class="lg-title">Équipements</div>
+          <div class="legend-item" data-component="poulie">
+            <div class="legend-dot" style="background:#00FFaa;"></div><span>Poulie & Harnais</span>
+          </div>
+          <div class="legend-item" data-component="freinage">
+            <div class="legend-dot" style="background:#ff0044;"></div><span>Syst. Freinage</span>
+          </div>
+          <div class="legend-item" data-component="poteau-arrivee">
+            <div class="legend-dot" style="background:#ff8800;"></div><span>Poteau d'Arrivée</span>
+          </div>
+          <div class="legend-item" data-component="ancrage">
+            <div class="legend-dot" style="background:#996633;"></div><span>Ancrages au Sol ×3</span>
+          </div>
+          <div class="legend-item" data-component="terrain">
+            <div class="legend-dot" style="background:#4a6741;"></div><span>Terrain</span>
+          </div>
         </div>
       </div>
-      
-      <div class="control-group telemetry">
-        <h4>Real-time Data</h4>
-        <div class="data-row"><span>Speed:</span><span id="rider-speed">0.0 m/s</span></div>
-        <div class="data-row"><span>Altitude:</span><span id="rider-altitude">0.0 m</span></div>
-        <div class="data-row"><span>Distance:</span><span id="rider-distance">0 m</span></div>
-        <div class="data-row"><span>Tension:</span><span id="cable-tension">45.0 kN</span></div>
-        <div class="data-row"><span>G-Force:</span><span id="g-force">1.0 g</span></div>
+    </div>
+
+    <!-- Section: Detail -->
+    <div class="cp-section cp-detail">
+      <div class="cp-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#00D9FF" stroke-width="2">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="16" x2="12" y2="12" />
+          <line x1="12" y1="8" x2="12.01" y2="8" />
+        </svg>
+        <span>Détails Techniques</span>
+      </div>
+      <div id="component-data">
+        <div class="detail-placeholder">Survolez ou cliquez un composant.</div>
       </div>
     </div>
   </div>
-  
-  <!-- Canvas container for Three.js -->
-  <div id="scene-container" style="width: 100vw; height: 100vh;"></div>
-  
-  <!-- Module entry point for Phase 2+ -->
-  <script type="module" src="/js/scene/SceneManager.js"></script>
+
+  <div class="bottom-stats">
+    <div class="stat-chip">
+      <div class="val">550<span>m</span></div>
+      <div class="lbl">Portée</div>
+    </div>
+    <div class="stat-chip">
+      <div class="val">18<span>m</span></div>
+      <div class="lbl">Hauteur Tour Départ</div>
+    </div>
+    <div class="stat-chip">
+      <div class="val">6<span>m</span></div>
+      <div class="lbl">Hauteur Tour Arrivée</div>
+    </div>
+    <div class="stat-chip">
+      <div class="val">45<span>kN</span></div>
+      <div class="lbl">Tension Max</div>
+    </div>
+  </div>
+
+  <div id="diagram-container" style="width: 100vw; height: 100vh;"></div>
+
+  <script type="module" src="/js/diagram/DiagramScene.js"></script>
 </body>
+
 </html>

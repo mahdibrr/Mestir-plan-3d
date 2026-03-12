@@ -7,7 +7,7 @@ export class DiagramScene {
     this.components = [];
     this.labels = [];
     this.explodeValue = 0;
-    this.clock = new THREE.Clock();
+    this.timer = new THREE.Timer();
     this.cableCurve = null;
     this.riderGroup = null;
     this.riderT = 0;
@@ -17,19 +17,28 @@ export class DiagramScene {
   }
 
   init() {
-    this.setupRenderer();
-    this.setupScene();
-    this.setupCamera();
-    this.setupControls();
-    this.buildAll();
-    this.setupRaycaster();
-    this.bindUI();
-    window.addEventListener('resize', () => this.onResize());
-    this.animate();
+    try {
+      this.setupRenderer();
+      this.setupScene();
+      this.setupCamera();
+      this.setupControls();
+      this.buildAll();
+      this.setupRaycaster();
+      this.bindUI();
+      window.addEventListener('resize', () => this.onResize());
+      this.animate();
+    } catch (error) {
+      this.showWebGLError(error);
+    }
   }
 
   setupRenderer() {
-    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    try {
+      this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    } catch (error) {
+      throw new Error('WebGL is not available in your browser. Please enable hardware acceleration or try a different browser.');
+    }
+    
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
@@ -37,6 +46,43 @@ export class DiagramScene {
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
     this.container.appendChild(this.renderer.domElement);
+  }
+
+  showWebGLError(error) {
+    console.error('WebGL initialization failed:', error);
+    
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = `
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.9);
+      color: #fff;
+      padding: 30px;
+      border-radius: 10px;
+      max-width: 500px;
+      text-align: center;
+      font-family: Arial, sans-serif;
+      z-index: 1000;
+    `;
+    
+    errorDiv.innerHTML = `
+      <h2 style="margin-top: 0; color: #ff6b6b;">WebGL Not Available</h2>
+      <p style="margin: 15px 0;">This 3D visualization requires WebGL, which is currently unavailable in your browser.</p>
+      <p style="margin: 15px 0; font-size: 14px; color: #ccc;">
+        <strong>Possible solutions:</strong><br>
+        • Enable hardware acceleration in your browser settings<br>
+        • Update your graphics drivers<br>
+        • Try a different browser (Chrome, Firefox, Edge)<br>
+        • Check if WebGL is blocked by browser extensions
+      </p>
+      <p style="margin: 15px 0; font-size: 12px; color: #888;">
+        Error: ${error.message}
+      </p>
+    `;
+    
+    this.container.appendChild(errorDiv);
   }
 
   setupScene() {
@@ -681,8 +727,9 @@ export class DiagramScene {
 
   animate() {
     requestAnimationFrame(() => this.animate());
-    const t = this.clock.getElapsedTime();
-    const dt = this.clock.getDelta();
+    this.timer.update();
+    const t = this.timer.getElapsed();
+    const dt = this.timer.getDelta();
     // Ocean waves
     if (this.ocean) {
       const pos = this.ocean.geometry.attributes.position;
@@ -708,8 +755,8 @@ export class DiagramScene {
         this.stopDemo();
       }
       this.positionRiderOnCable(this.riderT);
-      // Update telemetry
-      const speedKmh = (this.demoSpeed * 550 / 0.004 * 15 / 550 * 54).toFixed(0);
+      // Max real speed ~55 km/h at cruise (demoSpeed=0.004)
+      const speedKmh = ((this.demoSpeed / 0.004) * 55).toFixed(0);
       const dist = (this.riderT * 550).toFixed(0);
       const alt = this.cableCurve.getPoint(this.riderT).y.toFixed(1);
       const es = document.getElementById('tel-speed');
