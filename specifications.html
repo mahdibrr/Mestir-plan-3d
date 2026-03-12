@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spécifications Techniques - Tyrolienne Monastir</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/specs.css">
+</head>
+<body>
+  <nav class="glass-nav">
+    <div class="nav-container">
+      <div class="logo">Tyrolienne <span>Spécs</span></div>
+      <div class="nav-links">
+        <a href="/">Accueil</a>
+        <a href="/scene-3d.html">Expérience 3D</a>
+        <a href="/specifications.html">Spécifications</a>
+        <a href="/technical-diagram.html">Schéma</a>
+      </div>
+    </div>
+  </nav>
+  
+  <main class="dashboard-container">
+    <aside class="dashboard-sidebar glass-panel">
+      <h2>Calculateur de Charge</h2>
+      <div class="input-group">
+        <label>Poids du Passager (kg) <span id="weight-val">80</span></label>
+        <input type="range" id="rider-weight" min="40" max="150" value="80">
+      </div>
+      <div class="input-group">
+        <label>Vitesse du Vent (km/h) <span id="wind-val">10</span></label>
+        <input type="range" id="wind-speed" min="0" max="150" value="10">
+      </div>
+      <div class="input-group">
+        <label>Température (°C) <span id="temp-val">25</span></label>
+        <input type="range" id="temperature" min="-5" max="45" value="25">
+      </div>
+      
+      <div class="calc-results">
+        <div class="result-row">
+          <span>Tension Max du Câble :</span>
+          <strong id="calc-tension">45.0 kN</strong>
+        </div>
+        <div class="result-row">
+          <span>Facteur de Sécurité Cible :</span>
+          <strong>3.5</strong>
+        </div>
+        <div class="result-row">
+          <span>Facteur de Sécurité Actuel :</span>
+          <strong id="calc-sf" style="color:var(--color-primary)">3.5</strong>
+        </div>
+      </div>
+    </aside>
+
+    <section class="dashboard-charts">
+      <div class="chart-card glass-panel">
+        <h3>Répartition des Charges</h3>
+        <canvas id="loadChart"></canvas>
+      </div>
+      <div class="chart-card glass-panel">
+        <h3>Profil du Vent selon l'Altitude</h3>
+        <canvas id="windChart"></canvas>
+      </div>
+      <div class="chart-card glass-panel">
+        <h3>Spécifications des Matériaux (Acier vs Béton)</h3>
+        <canvas id="materialChart"></canvas>
+      </div>
+      <div class="chart-card glass-panel">
+        <h3>Données de la Structure</h3>
+        <table class="specs-table">
+          <tr><th>Attribut</th><th>Valeur</th></tr>
+          <tr><td>Hauteur de la Tour</td><td>28m</td></tr>
+          <tr><td>Portée du Câble</td><td>550m</td></tr>
+          <tr><td>Structure Principale</td><td>Acier S355J2</td></tr>
+          <tr><td>Classe de Corrosion</td><td>C4 (Élevée)</td></tr>
+        </table>
+      </div>
+    </section>
+  </main>
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script type="module" src="/js/specs/DataVisualizer.js"></script>
+</body>
+</html>
