@@ -7,8 +7,7 @@ export default defineConfig({
       input: {
         main: 'index.html',
         scene: 'scene-3d.html',
-        specs: 'specifications.html',
-        diagram: 'technical-diagram.html'
+        specs: 'specifications.html'
       }
     }
   }
