@@ -7,7 +7,7 @@ export class DiagramScene {
     this.components = [];
     this.labels = [];
     this.explodeValue = 0;
-    this.timer = new THREE.Timer();
+    this.clock = new THREE.Clock();
     this.cableCurve = null;
     this.riderGroup = null;
     this.riderT = 0;
@@ -726,49 +726,49 @@ export class DiagramScene {
   }
 
   animate() {
-    requestAnimationFrame(() => this.animate());
-    this.timer.update();
-    const t = this.timer.getElapsed();
-    const dt = this.timer.getDelta();
-    // Ocean waves
-    if (this.ocean) {
-      const pos = this.ocean.geometry.attributes.position;
-      for (let i = 0; i < pos.count; i++) {
-        const x = pos.getX(i), y = pos.getY(i);
-        pos.setZ(i, Math.sin(x * 0.08 + t) * 0.4 + Math.cos(y * 0.06 + t * 0.7) * 0.3);
+      requestAnimationFrame(() => this.animate());
+      const dt = this.clock.getDelta();
+      const t = this.clock.getElapsedTime();
+
+      // Ocean waves
+      if (this.ocean) {
+        const pos = this.ocean.geometry.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i), y = pos.getY(i);
+          pos.setZ(i, Math.sin(x * 0.08 + t) * 0.4 + Math.cos(y * 0.06 + t * 0.7) * 0.3);
+        }
+        pos.needsUpdate = true;
       }
-      pos.needsUpdate = true;
+      // Rider demo animation
+      if (this.demoRunning && this.cableCurve) {
+        // Acceleration phase (0-0.15), cruise (0.15-0.75), braking (0.75-1.0)
+        if (this.riderT < 0.15) {
+          this.demoSpeed = Math.min(this.demoSpeed + 0.0003, 0.004);
+        } else if (this.riderT < 0.75) {
+          this.demoSpeed = 0.004;
+        } else {
+          this.demoSpeed = Math.max(this.demoSpeed - 0.0002, 0.0003);
+        }
+        this.riderT += this.demoSpeed;
+        if (this.riderT >= 0.98) {
+          this.riderT = 0.98;
+          this.stopDemo();
+        }
+        this.positionRiderOnCable(this.riderT);
+        // Max real speed ~55 km/h at cruise (demoSpeed=0.004)
+        const speedKmh = ((this.demoSpeed / 0.004) * 55).toFixed(0);
+        const dist = (this.riderT * 550).toFixed(0);
+        const alt = this.cableCurve.getPoint(this.riderT).y.toFixed(1);
+        const es = document.getElementById('tel-speed');
+        const ed = document.getElementById('tel-dist');
+        const ea = document.getElementById('tel-alt');
+        if (es) es.textContent = speedKmh + ' km/h';
+        if (ed) ed.textContent = dist + ' m';
+        if (ea) ea.textContent = alt + ' m';
+      }
+      this.controls.update();
+      this.renderer.render(this.scene, this.camera);
     }
-    // Rider demo animation
-    if (this.demoRunning && this.cableCurve) {
-      // Acceleration phase (0-0.15), cruise (0.15-0.75), braking (0.75-1.0)
-      if (this.riderT < 0.15) {
-        this.demoSpeed = Math.min(this.demoSpeed + 0.0003, 0.004);
-      } else if (this.riderT < 0.75) {
-        this.demoSpeed = 0.004;
-      } else {
-        this.demoSpeed = Math.max(this.demoSpeed - 0.0002, 0.0003);
-      }
-      this.riderT += this.demoSpeed;
-      if (this.riderT >= 0.98) {
-        this.riderT = 0.98;
-        this.stopDemo();
-      }
-      this.positionRiderOnCable(this.riderT);
-      // Max real speed ~55 km/h at cruise (demoSpeed=0.004)
-      const speedKmh = ((this.demoSpeed / 0.004) * 55).toFixed(0);
-      const dist = (this.riderT * 550).toFixed(0);
-      const alt = this.cableCurve.getPoint(this.riderT).y.toFixed(1);
-      const es = document.getElementById('tel-speed');
-      const ed = document.getElementById('tel-dist');
-      const ea = document.getElementById('tel-alt');
-      if (es) es.textContent = speedKmh + ' km/h';
-      if (ed) ed.textContent = dist + ' m';
-      if (ea) ea.textContent = alt + ' m';
-    }
-    this.controls.update();
-    this.renderer.render(this.scene, this.camera);
-  }
 }
 
 if (document.getElementById('diagram-container')) {
