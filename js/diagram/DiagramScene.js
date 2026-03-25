@@ -215,8 +215,80 @@ export class DiagramScene {
     this.controls.target.set(0, 14, 30);
     this.controls.minDistance = 30;
     this.controls.maxDistance = 400;
-    this.controls.autoRotate = true;
-    this.controls.autoRotateSpeed = 0.3;
+    this.controls.autoRotate = false;
+    this.controls.autoRotateSpeed = 0;
+  }
+
+  setCameraView(viewName) {
+    let targetPos, targetLookAt;
+    
+    switch (viewName) {
+      case 'overview':
+        targetPos = new THREE.Vector3(110, 65, 130);
+        targetLookAt = new THREE.Vector3(0, 14, 30);
+        break;
+        
+      case 'tower1':
+        // Departure tower close-up
+        targetPos = new THREE.Vector3(35, 25, -15);
+        targetLookAt = new THREE.Vector3(0, 15, 0);
+        break;
+        
+      case 'tower2':
+        // Arrival post close-up
+        targetPos = new THREE.Vector3(-25, 15, 95);
+        targetLookAt = new THREE.Vector3(0, 5, 115);
+        break;
+        
+      case 'cable':
+        // Cable view
+        targetPos = new THREE.Vector3(-15, 35, 10);
+        targetLookAt = new THREE.Vector3(0, 20, 115);
+        break;
+        
+      case 'plan':
+        // Top-down plan view
+        targetPos = new THREE.Vector3(0, 200, 57);
+        targetLookAt = new THREE.Vector3(0, 0, 57);
+        break;
+        
+      case 'side':
+        // Side view
+        targetPos = new THREE.Vector3(150, 30, 57);
+        targetLookAt = new THREE.Vector3(0, 15, 57);
+        break;
+        
+      default:
+        return;
+    }
+    
+    this.animateCameraTo(targetPos, targetLookAt);
+  }
+
+  animateCameraTo(position, lookAt) {
+    // Simple animation using requestAnimationFrame
+    const startPos = this.camera.position.clone();
+    const startTarget = this.controls.target.clone();
+    const duration = 1500; // ms
+    const startTime = Date.now();
+    
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const t = Math.min(elapsed / duration, 1);
+      
+      // Easing function (ease-in-out)
+      const eased = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+      
+      this.camera.position.lerpVectors(startPos, position, eased);
+      this.controls.target.lerpVectors(startTarget, lookAt, eased);
+      this.controls.update();
+      
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    
+    animate();
   }
 
   // Material helper (PBR Upgrade)
@@ -602,11 +674,6 @@ export class DiagramScene {
       const geo = new THREE.TubeGeometry(curve, 150, r, 8, false);
       const mesh = new THREE.Mesh(geo, this.M(color, 0.9, 0.2, extraMat));
       this.add(mesh, name, comp, specs, new THREE.Vector3(0, 1, 0));
-      for (let j = 1; j < 10; j++) {
-        const pt = curve.getPoint(j / 10);
-        const clamp = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.6), this.M(0x333333, 0.8, 0.3));
-        clamp.position.copy(pt); this.scene.add(clamp);
-      }
     };
 
     makeCatenary(0, 0.14, 0xcccccc, 'Câble Principal Ø16mm', 'cable-principal',
@@ -785,23 +852,56 @@ export class DiagramScene {
     this.raycaster.setFromCamera(this.mouse, this.camera);
     const hits = this.raycaster.intersectObjects(this.components, true);
     const el = document.getElementById('component-data');
+    const hoverEl = document.getElementById('hover-description');
 
-    // Reset emissive
-    this.components.forEach(c => { if (c.material) c.material.emissiveIntensity = 0; });
+    // Reset emissive for all components
+    this.components.forEach(c => { 
+      if (c.material && !Array.isArray(c.material)) {
+        c.material.emissive = new THREE.Color(0x000000);
+        c.material.emissiveIntensity = 0;
+      }
+    });
 
     if (hits.length > 0) {
       let obj = hits[0].object;
-      while (obj.parent && !obj.userData.name && obj.parent !== this.scene) obj = obj.parent;
-      if (obj.userData.name) {
+      
+      // Find the component with userData
+      while (obj.parent && !obj.userData.component && obj.parent !== this.scene) {
+        obj = obj.parent;
+      }
+      
+      if (obj.userData.component) {
         this.hovered = obj;
         document.body.style.cursor = 'pointer';
-        if (obj.material) { obj.material.emissive = new THREE.Color(0x00D9FF); obj.material.emissiveIntensity = 0.4; }
-        el.innerHTML = `<div class="detail-title">${obj.userData.name}</div><div class="detail-specs">${obj.userData.specs}</div>`;
+        
+        // Highlight all components with the same component type
+        const componentType = obj.userData.component;
+        this.components.forEach(c => {
+          if (c.userData.component === componentType && c.material && !Array.isArray(c.material)) {
+            c.material.emissive = new THREE.Color(0x00D9FF);
+            c.material.emissiveIntensity = 0.5;
+          }
+        });
+        
+        // Show details in both panels
+        if (obj.userData.name) {
+          const detailHTML = `<div class="detail-title">${obj.userData.name}</div><div class="detail-specs">${obj.userData.specs}</div>`;
+          const hoverHTML = `<div class="desc-title">${obj.userData.name}</div><div class="desc-content">${obj.userData.specs}</div>`;
+          
+          if (el) el.innerHTML = detailHTML;
+          if (hoverEl) hoverEl.innerHTML = hoverHTML;
+        }
         return;
       }
     }
+    
     this.hovered = null;
     document.body.style.cursor = 'default';
+    
+    // Reset hover description
+    if (hoverEl) {
+      hoverEl.innerHTML = '<div class="desc-placeholder">Survolez un composant pour voir les détails</div>';
+    }
   }
 
   showDetail(d) {
@@ -817,25 +917,101 @@ export class DiagramScene {
       const v = document.getElementById('explode-val');
       if (v) v.textContent = Math.round(this.explodeValue * 100) + '%';
     });
-    document.getElementById('rotation-speed')?.addEventListener('input', e => {
-      this.controls.autoRotateSpeed = parseFloat(e.target.value) * 2;
-      const v = document.getElementById('rotate-val');
-      if (v) v.textContent = Math.round(parseFloat(e.target.value) * 100) + '%';
-    });
     document.getElementById('demo-btn')?.addEventListener('click', () => this.startDemo());
+    
+    // Navigation buttons
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const view = e.target.dataset.view;
+        this.setCameraView(view);
+        
+        // Update active state
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+      });
+    });
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      
+      const key = e.key.toLowerCase();
+      let view = null;
+      
+      switch(key) {
+        case '1':
+          view = 'tower1';
+          break;
+        case '2':
+          view = 'tower2';
+          break;
+        case '0':
+        case 'o':
+          view = 'overview';
+          break;
+        case 'p':
+          view = 'plan';
+          break;
+        case 'c':
+          view = 'cable';
+          break;
+        case 's':
+          view = 'side';
+          break;
+        case ' ':
+          e.preventDefault();
+          document.getElementById('demo-btn')?.click();
+          return;
+      }
+      
+      if (view) {
+        e.preventDefault();
+        this.setCameraView(view);
+        
+        // Update active button state
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+          if (btn.dataset.view === view) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+      }
+    });
+    
     // Legend hover
     document.querySelectorAll('.legend-item').forEach(item => {
       const comp = item.dataset.component;
       item.addEventListener('mouseenter', () => {
         this.components.forEach(c => {
-          if (c.material && c.userData.component === comp) {
+          if (c.material && !Array.isArray(c.material) && c.userData.component === comp) {
             c.material.emissive = new THREE.Color(0x00D9FF);
-            c.material.emissiveIntensity = 0.5;
+            c.material.emissiveIntensity = 0.6;
           }
         });
+        
+        // Show description in hover panel
+        const m = this.components.find(c => c.userData.component === comp && c.userData.name);
+        if (m) {
+          const hoverEl = document.getElementById('hover-description');
+          if (hoverEl) {
+            hoverEl.innerHTML = `<div class="desc-title">${m.userData.name}</div><div class="desc-content">${m.userData.specs}</div>`;
+          }
+        }
       });
       item.addEventListener('mouseleave', () => {
-        this.components.forEach(c => { if (c.material) c.material.emissiveIntensity = 0; });
+        this.components.forEach(c => { 
+          if (c.material && !Array.isArray(c.material)) {
+            c.material.emissive = new THREE.Color(0x000000);
+            c.material.emissiveIntensity = 0;
+          }
+        });
+        
+        // Reset hover description
+        const hoverEl = document.getElementById('hover-description');
+        if (hoverEl) {
+          hoverEl.innerHTML = '<div class="desc-placeholder">Survolez un composant pour voir les détails</div>';
+        }
       });
       item.addEventListener('click', () => {
         const m = this.components.find(c => c.userData.component === comp && c.userData.name);

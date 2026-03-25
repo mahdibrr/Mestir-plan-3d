@@ -34,6 +34,7 @@ export class UIController {
     if (demoBtn) {
       // We're on the diagram page - use different controls
       this.initDiagramControls();
+      this.initKeyboardShortcuts();
       return;
     }
     
@@ -69,6 +70,25 @@ export class UIController {
         btn.addEventListener('click', (e) => {
           const view = e.target.dataset.view;
           this.sceneManager.setCameraView(view);
+          
+          // Update active state
+          this.elements.viewBtns.forEach(b => b.classList.remove('active'));
+          e.target.classList.add('active');
+        });
+      });
+    }
+    
+    // Navigation buttons
+    const navBtns = document.querySelectorAll('.nav-btn');
+    if (navBtns) {
+      navBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const view = e.target.dataset.view;
+          this.sceneManager.setCameraView(view);
+          
+          // Update active state
+          navBtns.forEach(b => b.classList.remove('active'));
+          e.target.classList.add('active');
         });
       });
     }
@@ -108,6 +128,65 @@ export class UIController {
         this.elements.togglePanelBtn.innerHTML = this.elements.panel.classList.contains('collapsed') ? '+' : '&minus;';
       });
     }
+    
+    this.initKeyboardShortcuts();
+  }
+  
+  initKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      // Ignore if typing in input field
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      
+      const key = e.key.toLowerCase();
+      let view = null;
+      
+      switch(key) {
+        case '1':
+          view = 'tower1';
+          break;
+        case '2':
+          view = 'tower2';
+          break;
+        case '0':
+        case 'o':
+          view = 'overview';
+          break;
+        case 'p':
+          view = 'plan';
+          break;
+        case 'c':
+          view = 'cable';
+          break;
+        case 's':
+          view = 'side';
+          break;
+        case ' ':
+          e.preventDefault();
+          // Toggle play/pause
+          const demoBtn = document.getElementById('demo-btn');
+          if (demoBtn) {
+            demoBtn.click();
+          } else if (this.elements.playPauseBtn) {
+            this.elements.playPauseBtn.click();
+          }
+          return;
+      }
+      
+      if (view) {
+        e.preventDefault();
+        this.sceneManager.setCameraView(view);
+        
+        // Update active button state
+        const navBtns = document.querySelectorAll('.nav-btn');
+        navBtns.forEach(btn => {
+          if (btn.dataset.view === view) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+      }
+    });
   }
   
   initDiagramControls() {

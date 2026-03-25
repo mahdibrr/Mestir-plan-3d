@@ -33,18 +33,32 @@ export class CameraController {
         targetLookAt = new THREE.Vector3(0, 0, 0);
         break;
         
+      case 'tower1':
       case 'tower':
-        // Close up on departure tower
-        // Assume tower is at sceneData.departurePos
+        // Close up on departure tower (Tower 1)
         targetPos = new THREE.Vector3(
-          sceneData.departurePos.x + 30, 
-          sceneData.departurePos.y + 25, 
-          sceneData.departurePos.z + 30
+          sceneData.departurePos.x + 40, 
+          sceneData.departurePos.y + 20, 
+          sceneData.departurePos.z + 40
         );
         targetLookAt = new THREE.Vector3(
           sceneData.departurePos.x, 
           sceneData.departurePos.y + 15, 
           sceneData.departurePos.z
+        );
+        break;
+        
+      case 'tower2':
+        // Close up on arrival tower (Tower 2)
+        targetPos = new THREE.Vector3(
+          sceneData.arrivalPos.x - 30, 
+          sceneData.arrivalPos.y + 15, 
+          sceneData.arrivalPos.z - 30
+        );
+        targetLookAt = new THREE.Vector3(
+          sceneData.arrivalPos.x, 
+          sceneData.arrivalPos.y + 5, 
+          sceneData.arrivalPos.z
         );
         break;
         
@@ -56,6 +70,29 @@ export class CameraController {
           sceneData.departurePos.z - 10
         );
         targetLookAt = sceneData.arrivalPos;
+        break;
+        
+      case 'plan':
+        // Top-down plan view
+        const midX = (sceneData.departurePos.x + sceneData.arrivalPos.x) / 2;
+        const midZ = (sceneData.departurePos.z + sceneData.arrivalPos.z) / 2;
+        targetPos = new THREE.Vector3(midX, 500, midZ);
+        targetLookAt = new THREE.Vector3(midX, 0, midZ);
+        break;
+        
+      case 'side':
+        // Side view showing cable profile
+        const midPoint = new THREE.Vector3(
+          (sceneData.departurePos.x + sceneData.arrivalPos.x) / 2,
+          (sceneData.departurePos.y + sceneData.arrivalPos.y) / 2,
+          (sceneData.departurePos.z + sceneData.arrivalPos.z) / 2
+        );
+        targetPos = new THREE.Vector3(
+          midPoint.x,
+          midPoint.y + 50,
+          midPoint.z + 400
+        );
+        targetLookAt = midPoint;
         break;
         
       default:
